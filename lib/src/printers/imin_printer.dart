@@ -1,0 +1,323 @@
+import 'package:imin_printer/imin_printer.dart';
+import 'package:imin_printer/enums.dart';
+import 'package:imin_printer/imin_style.dart';
+import 'package:imin_printer/column_maker.dart';
+import '../models/print_element.dart';
+import '../models/print_style.dart';
+import 'printer_interface.dart';
+
+class IMinPrinter implements RSPrinterInterface {
+  final IminPrinter _iminPrinter = IminPrinter();
+  String? _sdkVersion; // 用于区分v1(1.0.0)和v2(2.0.0)
+
+  // 初始化时获取SDK版本
+  Future<void> _initSdkVersion() async {
+    if (_sdkVersion == null) {
+      _sdkVersion = await _iminPrinter.getSdkVersion() ?? '1.0.0';
+    }
+  }
+
+  // 判断是否为v2版本
+  bool get _isV2 => _sdkVersion == '2.0.0';
+
+  @override
+  Future<bool> connect() async {
+    try {
+      await _initSdkVersion();
+      // 根据版本初始化打印机
+      if (_isV2) {
+        await _iminPrinter.initPrinterParams(); // v2初始化
+      } else {
+        await _iminPrinter.initPrinter(); // v1初始化
+      }
+      return await isConnected();
+    } catch (e) {
+      print('IMin printer connect error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<void> disconnect() async {
+    if (_isV2) {
+      await _iminPrinter.unBindService(); // v2断开服务
+    }
+    // v1无明确disconnect方法，仅初始化相反操作
+  }
+
+  @override
+  Future<bool> printElements(List<PrintElement> elements) async {
+    if (!await isConnected()) {
+      if (!await connect()) {
+        return false;
+      }
+    }
+
+    try {
+      for (var element in elements) {
+        bool result = false;
+        switch (element.type) {
+          case ElementType.text:
+            result = await printText(
+              (element as TextElement).content,
+              element.style,
+            );
+            break;
+          case ElementType.qrCode:
+            var qrElement = element as QrCodeElement;
+            result = await printQrCode(
+              qrElement.data,
+              qrElement.width,
+              qrElement.height,
+              qrElement.style,
+            );
+            break;
+          case ElementType.line:
+            var lineElement = element as LineElement;
+            result = await printLine(lineElement.lineStyle);
+            break;
+          case ElementType.blank:
+            result = await printBlank((element as BlankElement).count);
+            break;
+        }
+        if (!result) return false;
+      }
+      // 打印完成后走纸+切纸
+      await _printAndFeedPaper(70);
+      await _partialCut();
+      return true;
+    } catch (e) {
+      print('IMin print elements error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> printText(String text, PrintStyle style) async {
+    try {
+      // IminTextStyle 相关API:
+
+      // 属性	说明	类型	默认值
+      // √ wordWrap	打印文字内容是否加入\n, true或者不设置自动加\n, 为false不加\n	bool	无
+      // √  fontSize	打印文字大小	int	无
+      // x space	打印文字行间距	double	无
+      // x width	打印文字宽度	int	无
+      // √  typeface	打印文字字体	IminTypeface	无
+      // √  fontStyle	打印文字样式	IminFontStyle	无
+      // √  align	打印文字对齐方式	IminPrintAlign	无
+      final align = _convertAlignment(style.alignment);
+      final fontSize = _convertFontSize(style.fontSize);
+      final typeface = _convertTypeface(style);
+      final fontStyle = _convertFontStyle(style);
+
+      // 根据版本和 reverseBlackWhite 创建不同的样式
+      if (_isV2) {
+        // v2 版本：包含 space 属性
+        final textStyle = IminTextStyle(
+          align: align,
+          fontSize: fontSize,
+          space: 1.0, // v2 特有的 space 属性
+          typeface: typeface,
+          fontStyle: fontStyle,
+          wordWrap: true,
+        );
+
+        if (style.reverseBlackWhite) {
+          await _iminPrinter.printAntiWhiteText(text, style: textStyle);
+        } else {
+          await _iminPrinter.printText(text, style: textStyle);
+        }
+      } else {
+        // v1 版本：不包含 space 属性
+        final textStyle = IminTextStyle(
+          align: align,
+          fontSize: fontSize,
+          typeface: typeface,
+          wordWrap: true,
+        );
+
+        if (style.reverseBlackWhite) {
+          await _iminPrinter.printAntiWhiteText(text, style: textStyle);
+        } else {
+          await _iminPrinter.printText(text, style: textStyle);
+        }
+      }
+
+      return true;
+    } catch (e) {
+      print('IMin print text error: $e');
+      return false;
+    }
+  }
+
+  // 实现二维码打印
+  @override
+  Future<bool> printQrCode(
+    String data,
+    double width,
+    double height,
+    PrintStyle style,
+  ) async {
+    try {
+      final align = _convertAlignment(style.alignment);
+      final qrSize = (width / 30).clamp(1, 10).toInt();
+
+      if (_isV2) {
+        // 直接调用方法，不获取返回值
+        await _iminPrinter.printQrCode(
+          data,
+          qrCodeStyle: IminQrCodeStyle(
+            align: align,
+            qrSize: qrSize,
+            errorCorrectionLevel: IminQrcodeCorrectionLevel.levelH,
+          ),
+        );
+      } else {
+        // 直接调用方法，不获取返回值
+        await _iminPrinter.printQrCode(
+          data,
+          qrCodeStyle: IminQrCodeStyle(
+            align: align,
+            qrSize: qrSize,
+            errorCorrectionLevel: IminQrcodeCorrectionLevel.levelH,
+          ),
+        );
+      }
+      // 无异常则视为成功
+      return true;
+    } catch (e) {
+      print('IMin print QR code error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> printLine(LineStyle style) async {
+    // try {
+    //   if (_isV2) {
+    //     // v2版本打印线条
+    //     switch (style) {
+    //       case LineStyle.boldSolid:
+    //         return await _iminPrinter.printSolidLine(thickness: 2) ?? false;
+    //       case LineStyle.dotted:
+    //         return await _iminPrinter.printDottedLine() ?? false;
+    //       default:
+    //         return await _iminPrinter.printSolidLine(thickness: 1) ?? false;
+    //     }
+    //   } else {
+    //     // v1版本打印线条
+    //     switch (style) {
+    //       case LineStyle.boldSolid:
+    //         return await _iminPrinter.printSolidLine(thickness: 2) ?? false;
+    //       case LineStyle.dotted:
+    //         return await _iminPrinter.printDottedLine() ?? false;
+    //       default:
+    //         return await _iminPrinter.printSolidLine(thickness: 1) ?? false;
+    //     }
+    //   }
+    // } catch (e) {
+    //   print('IMin print line error: $e');
+    return false;
+    // }
+  }
+
+  @override
+  Future<bool> printBlank(int lines) async {
+    try {
+      if (_isV2) {
+        // v2版本：直接调用，不获取返回值
+        await _iminPrinter.printAndFeedPaper(lines * 30);
+      } else {
+        // v1版本：直接调用，不获取返回值
+        // await _iminPrinter.printBlankLines(lines);
+      }
+      // 无异常则视为成功
+      return true;
+    } catch (e) {
+      print('IMin print blank error: $e');
+      return false;
+    }
+  }
+
+  // @override
+  // Future<bool> printBlank(int lines) async {
+  //   try {
+  //     if (_isV2) {
+  //       // v2版本打印空白行（每行约30单位高度）
+  //       return await _iminPrinter.printAndFeedPaper(lines * 30) ?? false;
+  //     } else {
+  //       // v1版本打印空白行
+  //       return await _iminPrinter.printBlankLines(lines) ?? false;
+  //     }
+  //   } catch (e) {
+  //     print('IMin print blank error: $e');
+  //     return false;
+  //   }
+  // }
+  //  检查打印机是否连接
+  @override
+  Future<bool> isConnected() async {
+    try {
+      // 通过获取打印机状态判断是否连接
+      final status = await _iminPrinter.getPrinterStatus();
+      return status?['code'] == 0; // 假设code=0为正常状态
+    } catch (e) {
+      print('IMin check connection error: $e');
+      return false;
+    }
+  }
+
+  // 辅助方法：走纸
+  Future<void> _printAndFeedPaper(int distance) async {
+    await _iminPrinter.printAndFeedPaper(distance);
+  }
+
+  // 辅助方法：部分切纸
+  Future<void> _partialCut() async {
+    await _iminPrinter.partialCut();
+  }
+
+  // 转换对齐方式（自定义Align -> IminPrintAlign）
+  IminPrintAlign _convertAlignment(Alignment alignment) {
+    switch (alignment) {
+      case Alignment.center:
+        return IminPrintAlign.center;
+      case Alignment.right:
+        return IminPrintAlign.right;
+      default:
+        return IminPrintAlign.left;
+    }
+  }
+
+  // 转换字体大小（自定义FontSize -> 数值）
+  int _convertFontSize(FontSize fontSize) {
+    switch (fontSize) {
+      case FontSize.small:
+        return 20;
+      case FontSize.large:
+        return 28;
+      default: // normal
+        return 24;
+    }
+  }
+
+  // 转换字体样式（自定义PrintStyle -> IminTypeface）
+  _convertTypeface(PrintStyle style) {
+    // 根据 isBold 和 isItalic 组合生成 typeface
+    IminTypeface typeface = IminTypeface.typefaceDefault;
+    if (style.isBold) {
+      typeface = IminTypeface.typefaceDefaultBold;
+    }
+    return typeface;
+  }
+
+  _convertFontStyle(PrintStyle style) {
+    IminFontStyle fontStyle = IminFontStyle.normal;
+    if (style.isItalic && style.isBold) {
+      fontStyle = IminFontStyle.boldItalic;
+    } else if (style.isItalic) {
+      fontStyle = IminFontStyle.italic;
+    }
+    return fontStyle;
+  }
+}
