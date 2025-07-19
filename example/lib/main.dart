@@ -69,28 +69,29 @@ class _MyAppState extends State<MyApp> {
 <column type = "TEXT">取号时间:${queueDateTimeStr}</column>
 </row> 
 </#if>
-<#if true>
-<row  fontSize="normal" align="center" color="black" isBold="false" isItalic="false">
-<column type = "QR_CODE"  fontSize="normal" align="center" color="black" isBold="false" width="50%" high="50%" isItalic="false"  >${queueUpQR?default('')}</column>
-</row>
-</#if>
 <#if queueNum??>
 <row  fontSize="normal" align="left" color="black" isBold="false" isItalic="false">
 <column type = "TEXT">桌台类型+排队号:<#if queueTypeName??>${queueTypeName}:</#if>${queueNum}</column>
 </row>
 </#if>
+<#if true>
+<row  fontSize="normal" align="center" color="black" isBold="false" isItalic="false">
+<column type = "QR_CODE"  fontSize="normal" align="center" color="black" isBold="false" width="50%" high="50%" isItalic="false"  >${queueUpQR?default('')}</column>
+</row>
+</#if>
+
 <row>
 <column type = "LINE" style = "dotted"></column>
 </row>
 </receipt></root>""";
 
               final data = <String, dynamic>{
-                'shopName': '',
+                'shopName': '中关村',
                 'guestCount': 3,
                 'queueCount': 0,
                 'queueDateTimeStr': '2025-07-19 18:30',
                 'queueUpQR': 'https://example.com/qr/12345',
-                // 'queueTypeName': '普通桌',
+                'queueTypeName': '普通桌',
                 'queueNum': 'A12',
               };
 
