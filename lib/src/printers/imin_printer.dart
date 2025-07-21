@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:imin_printer/imin_printer.dart';
 import 'package:imin_printer/enums.dart';
 import 'package:imin_printer/imin_style.dart';
@@ -98,6 +100,7 @@ class IMinPrinter implements RSPrinterInterface {
             result = await printBlank((element as BlankElement).count);
             break;
         }
+        print('result: $result');
         if (!result) return false;
       }
       // 打印完成后走纸+切纸
@@ -205,46 +208,87 @@ class IMinPrinter implements RSPrinterInterface {
     }
   }
 
+  _printSolidLine() async {
+    const List<int> ESC = [0x1B];
+    const List<int> GS  = [0x1D];
+
+    // 1. 打开下划线（0x1B 0x2D n），n=1（单线），n=2（双线）
+    List<int> openUnderline = [...ESC, 0x2D, 0x01];
+
+// 2. 打印一行空格，长度视你的打印宽度而定
+    List<int> spaces = List.filled(32, 0x20);  // 32 个空格
+
+// 3. 关闭下划线（n=0）
+    List<int> closeUnderline = [...ESC, 0x2D, 0x00];
+
+// 4. 换行
+    List<int> lineFeed = [0x0A];
+
+// 合并所有命令
+    Uint8List data = Uint8List.fromList([
+      ...openUnderline,
+      ...spaces,
+      ...closeUnderline,
+      ...lineFeed,
+    ]);
+
+    _iminPrinter.sendRAWData(data);
+  }
+
+  _printDottedLine() async {
+
+    const List<int> ESC = [0x1B];
+
+
+    List<int> data = [];
+
+// 要画多少段？画满一行就够了，比如 32 段
+    int segments =  pageSize == 58 ? 16 : 24;
+
+    for (int i = 0; i < segments; i++) {
+      // 打开下划线（单线）
+      data.addAll([...ESC, 0x2D, 0x01]);
+      // 打一格空格 → 这格有下划线
+      data.add(0x20);
+      // 关闭下划线
+      data.addAll([...ESC, 0x2D, 0x00]);
+      // 打一格空隙
+      data.add(0x20);
+    }
+
+// 全部段画完后，才换行
+    data.add(0x0A);
+
+    _iminPrinter.sendRAWData(Uint8List.fromList(data));}
+
+
   @override
   Future<bool> printLine(LineStyle style) async {
-    // try {
-    //   if (_isV2) {
-    //     // v2版本打印线条
-    //     switch (style) {
-    //       case LineStyle.boldSolid:
-    //         return await _iminPrinter.printSolidLine(thickness: 2) ?? false;
-    //       case LineStyle.dotted:
-    //         return await _iminPrinter.printDottedLine() ?? false;
-    //       default:
-    //         return await _iminPrinter.printSolidLine(thickness: 1) ?? false;
-    //     }
-    //   } else {
-    //     // v1版本打印线条
-    //     switch (style) {
-    //       case LineStyle.boldSolid:
-    //         return await _iminPrinter.printSolidLine(thickness: 2) ?? false;
-    //       case LineStyle.dotted:
-    //         return await _iminPrinter.printDottedLine() ?? false;
-    //       default:
-    //         return await _iminPrinter.printSolidLine(thickness: 1) ?? false;
-    //     }
-    //   }
-    // } catch (e) {
-    //   print('IMin print line error: $e');
-    return false;
-    // }
+    try {
+      // 根据纸张宽度计算填充字符数量（不同字体宽度不同，需调整）
+      switch (style) {
+        case LineStyle.boldSolid:
+          _printSolidLine();
+          break;
+        case LineStyle.dotted:
+          _printDottedLine();
+          break;
+        default:
+          _printSolidLine();
+      }
+      return true;
+    } catch (e) {
+      print('IMin print line error: $e');
+      return false;
+    }
   }
 
   @override
   Future<bool> printBlank(int lines) async {
     try {
-      if (_isV2) {
-        // v2版本：直接调用，不获取返回值
+
         await _iminPrinter.printAndFeedPaper(lines * 30);
-      } else {
-        // v1版本：直接调用，不获取返回值
-        // await _iminPrinter.printBlankLines(lines);
-      }
+
       // 无异常则视为成功
       return true;
     } catch (e) {

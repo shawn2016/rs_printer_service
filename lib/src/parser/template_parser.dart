@@ -75,20 +75,101 @@ double getHeight(XmlElement column, double totalHeight) {
   // 处理绝对值
   return double.tryParse(heightAttr) ?? totalHeight / 2;
 }
+//
+// // 处理模版
+// String renderTemplate(String tpl, Map<String, dynamic> data) {
+//   var xml = tpl;
+//
+//   // 0. 原始：先处理 <#if true/false>（全局有效）
+//   final ifTrueFalse = RegExp(r'<#if\s+(true|false)\s*>([\s\S]*?)</#if>');
+//   while (ifTrueFalse.hasMatch(xml)) {
+//     xml = xml.replaceAllMapped(ifTrueFalse, (m) =>
+//     m[1] == 'true' ? m[2]! : ''
+//     );
+//   }
+//
+//   // 1. **行级**: 剔除包着整行<row>的 <#if key??>…</#if>
+//   final rowIf = RegExp(
+//       r'<#if\s+(\w+)\s*\?\?\s*>\s*(<row[\s\S]*?<\/row>)\s*<\/#if>'
+//   );
+//   while (rowIf.hasMatch(xml)) {
+//     xml = xml.replaceAllMapped(rowIf, (m) {
+//       final key = m[1]!;
+//       final rowBlock = m[2]!;
+//       final value = data.containsKey(key) ? data[key] : null;
+//       // key 存在且非空，保留整个 <row> … </row>；否则一并删掉
+//       return (value != null && value.toString().trim().isNotEmpty)
+//           ? rowBlock
+//           : '';
+//     });
+//   }
+//
+//   // 2. **列级**: 剔除在 <column> 内部的 <#if key??>…</#if>，只删内部内容
+//   //    先拆出每个 column，再对子串做替换，最后再拼回去
+//   xml = xml.replaceAllMapped(
+//       RegExp(r'<column\b([^>]*)>([\s\S]*?)<\/column>'),
+//           (m) {
+//         final attrs = m[1]!;
+//         var inner = m[2]!;
+//
+//         // 删除 column 里因 key 缺失或空导致的 if 块
+//         final colIf = RegExp(r'<#if\s+(\w+)\s*\?\?\s*>([\s\S]*?)<\/#if>');
+//         while (colIf.hasMatch(inner)) {
+//           inner = inner.replaceAllMapped(colIf, (cm) {
+//             final key = cm[1]!;
+//             final content = cm[2]!;
+//             final value = data.containsKey(key) ? data[key] : null;
+//             // key 存在且非空，保留内部；否则删内部
+//             return (value != null && value.toString().trim().isNotEmpty)
+//                 ? content
+//                 : '';
+//           });
+//         }
+//
+//         return '<column$attrs>$inner</column>';
+//       }
+//   );
+//
+//   // 3. 默认值占位 ${key?default('xxx')}
+//   final defaultRe = RegExp(r"""\$\{(\w+)\?default\('([^']*)'\)\}""");
+//   xml = xml.replaceAllMapped(defaultRe, (m) {
+//     final key = m[1]!;
+//     final def = m[2]!;
+//     final value = data.containsKey(key) ? data[key] : null;
+//     return (value != null && value.toString().trim().isNotEmpty)
+//         ? value.toString()
+//         : def;
+//   });
+//
+//   // 4. 普通占位 ${key}
+//   final varRe = RegExp(r"""\$\{(\w+)\}""");
+//   xml = xml.replaceAllMapped(varRe, (m) {
+//     final key = m[1]!;
+//     final value = data.containsKey(key) ? data[key] : null;
+//     return (value != null && value.toString().trim().isNotEmpty)
+//         ? value.toString()
+//         : '';
+//   });
+//
+//   // （可选）清理空行、空标签
+//   xml = xml.replaceAll(RegExp(r'\s*<column[^>]*>\s*</column>\s*'), '');
+//   xml = xml.replaceAll(RegExp(r'\s*<row[^>]*>\s*</row>\s*'), '');
+//   xml = xml.replaceAll(RegExp(r'\n\s*\n'), '\n');
+//
+//   return xml.trim();
+// }
 
-// 处理模版
+
 String renderTemplate(String tpl, Map<String, dynamic> data) {
   var xml = tpl;
 
-  // 0. 原始：先处理 <#if true/false>（全局有效）
+  // 0. 处理 <#if true/false>
   final ifTrueFalse = RegExp(r'<#if\s+(true|false)\s*>([\s\S]*?)</#if>');
   while (ifTrueFalse.hasMatch(xml)) {
-    xml = xml.replaceAllMapped(ifTrueFalse, (m) =>
-    m[1] == 'true' ? m[2]! : ''
-    );
+    xml = xml.replaceAllMapped(ifTrueFalse, (m) => m[1] == 'true' ? m[2]! : '');
   }
 
-  // 1. **行级**: 剔除包着整行<row>的 <#if key??>…</#if>
+  // 1. 行级：剔除包着整行<row>的 <#if key??>…</#if>
   final rowIf = RegExp(
       r'<#if\s+(\w+)\s*\?\?\s*>\s*(<row[\s\S]*?<\/row>)\s*<\/#if>'
   );
@@ -97,32 +178,24 @@ String renderTemplate(String tpl, Map<String, dynamic> data) {
       final key = m[1]!;
       final rowBlock = m[2]!;
       final value = data.containsKey(key) ? data[key] : null;
-      // key 存在且非空，保留整个 <row> … </row>；否则一并删掉
-      return (value != null && value.toString().trim().isNotEmpty)
-          ? rowBlock
-          : '';
+      return (value != null && value.toString().trim().isNotEmpty) ? rowBlock : '';
     });
   }
 
-  // 2. **列级**: 剔除在 <column> 内部的 <#if key??>…</#if>，只删内部内容
-  //    先拆出每个 column，再对子串做替换，最后再拼回去
+  // 2. 列级：剔除 column 内部的 <#if key??>…</#if>
   xml = xml.replaceAllMapped(
       RegExp(r'<column\b([^>]*)>([\s\S]*?)<\/column>'),
           (m) {
         final attrs = m[1]!;
         var inner = m[2]!;
 
-        // 删除 column 里因 key 缺失或空导致的 if 块
         final colIf = RegExp(r'<#if\s+(\w+)\s*\?\?\s*>([\s\S]*?)<\/#if>');
         while (colIf.hasMatch(inner)) {
           inner = inner.replaceAllMapped(colIf, (cm) {
             final key = cm[1]!;
             final content = cm[2]!;
             final value = data.containsKey(key) ? data[key] : null;
-            // key 存在且非空，保留内部；否则删内部
-            return (value != null && value.toString().trim().isNotEmpty)
-                ? content
-                : '';
+            return (value != null && value.toString().trim().isNotEmpty) ? content : '';
           });
         }
 
@@ -130,30 +203,33 @@ String renderTemplate(String tpl, Map<String, dynamic> data) {
       }
   );
 
-  // 3. 默认值占位 ${key?default('xxx')}
+  // 3. 处理默认值占位 ${key?default('xxx')}
   final defaultRe = RegExp(r"""\$\{(\w+)\?default\('([^']*)'\)\}""");
   xml = xml.replaceAllMapped(defaultRe, (m) {
     final key = m[1]!;
     final def = m[2]!;
     final value = data.containsKey(key) ? data[key] : null;
-    return (value != null && value.toString().trim().isNotEmpty)
-        ? value.toString()
-        : def;
+    return (value != null && value.toString().trim().isNotEmpty) ? value.toString() : def;
   });
 
-  // 4. 普通占位 ${key}
+  // 4. 处理普通占位 ${key}
   final varRe = RegExp(r"""\$\{(\w+)\}""");
   xml = xml.replaceAllMapped(varRe, (m) {
     final key = m[1]!;
     final value = data.containsKey(key) ? data[key] : null;
-    return (value != null && value.toString().trim().isNotEmpty)
-        ? value.toString()
-        : '';
+    return (value != null && value.toString().trim().isNotEmpty) ? value.toString() : '';
   });
 
-  // （可选）清理空行、空标签
-  xml = xml.replaceAll(RegExp(r'\s*<column[^>]*>\s*</column>\s*'), '');
-  xml = xml.replaceAll(RegExp(r'\s*<row[^>]*>\s*</row>\s*'), '');
+  // 修复：清理空标签时保留 LINE/BLANK 类型的 column
+  // xml = xml.replaceAll(
+  //   RegExp(r'\s*<column(?![^>]*type=["\'](LINE|BLANK)["\'])[^>]*>\s*</column>\s*'),
+  //   '');
+
+  // xml = xml.replaceAll(RegExp(r'\s*<column(?![^>]*type=["\"](LINE|BLANK)["\"])[^>]*>\s*</column>\s*'), '');
+  // // 清理空 row 标签
+  // // 清理空 row 标签（如果有必要，可同样添加排除逻辑）
+  // xml = xml.replaceAll(RegExp(r'\s*<row[^>]*>\s*</row>\s*'), '');
+  // 清理多余空行
   xml = xml.replaceAll(RegExp(r'\n\s*\n'), '\n');
 
   return xml.trim();
