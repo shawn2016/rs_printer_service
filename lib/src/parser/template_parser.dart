@@ -45,6 +45,38 @@ import '../models/print_style.dart';
 
 //   return xml;
 // }
+
+// 获取宽度属性，支持绝对值和百分比
+double getWidth(XmlElement column, double totalWidth) {
+  final widthAttr = column.getAttribute('width') ?? '50%';
+
+  // 处理百分比
+  if (widthAttr.endsWith('%')) {
+    final percentStr = widthAttr.substring(0, widthAttr.length - 1);
+    final percent = double.tryParse(percentStr) ?? 50.0;
+    return totalWidth * (percent / 100); // 转换为实际宽度
+  }
+
+  // 处理绝对值
+  return double.tryParse(widthAttr) ?? totalWidth / 2;
+}
+
+// 获取高度属性，支持绝对值和百分比
+double getHeight(XmlElement column, double totalHeight) {
+  final heightAttr = column.getAttribute('high') ?? '50%';
+
+  // 处理百分比
+  if (heightAttr.endsWith('%')) {
+    final percentStr = heightAttr.substring(0, heightAttr.length - 1);
+    final percent = double.tryParse(percentStr) ?? 50.0;
+    return totalHeight * (percent / 100); // 转换为实际高度
+  }
+
+  // 处理绝对值
+  return double.tryParse(heightAttr) ?? totalHeight / 2;
+}
+
+// 处理模版
 String renderTemplate(String tpl, Map<String, dynamic> data) {
   var xml = tpl;
 
@@ -128,11 +160,17 @@ String renderTemplate(String tpl, Map<String, dynamic> data) {
 }
 
 class TemplateParser {
+  static double totalWidth = 0;
+  static double totalHeight = 0;
   /// 解析渲染后的纯 XML
   static List<PrintElement> parse(
     String templateXml,
     Map<String, dynamic> data,
+      int pageSize
   ) {
+
+    totalWidth = pageSize.toDouble();
+    totalHeight = pageSize.toDouble();
     final rendered = renderTemplate(templateXml, data);
 
     final elements = <PrintElement>[];
@@ -207,13 +245,15 @@ class TemplateParser {
   static QrCodeElement _parseQrCodeElement(XmlElement row, XmlElement column) {
     final data = column.text.trim();
     final style = _parsePrintStyle(row, column);
-    final width = double.tryParse(column.getAttribute('width') ?? '50%') ?? 50;
-    final height = double.tryParse(column.getAttribute('high') ?? '50%') ?? 50;
+
+
+    final width = getWidth(column, totalWidth);
+    final height = getHeight(column, totalHeight);
 
     return QrCodeElement(
       data: data,
-      width: width,
-      height: height,
+      width: width*10,
+      height: height*10,
       style: style,
     );
   }

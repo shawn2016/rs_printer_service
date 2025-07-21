@@ -9,7 +9,18 @@ import 'printer_interface.dart';
 class IMinPrinter implements RSPrinterInterface {
   final IminPrinter _iminPrinter = IminPrinter();
   String? _sdkVersion; // 用于区分v1(1.0.0)和v2(2.0.0)
+  int pageSize = 58; // 默认纸张大小
+  IMinPrinter({
+    this.pageSize = 58, // 默认值
+  });
 
+
+  // 设置纸张大小
+  Future<void> _setPageSize() async {
+    await _iminPrinter.setPageFormat(
+      style: this.pageSize
+    );
+  }
   // 初始化时获取SDK版本
   Future<void> _initSdkVersion() async {
     if (_sdkVersion == null) {
@@ -30,12 +41,20 @@ class IMinPrinter implements RSPrinterInterface {
       } else {
         await _iminPrinter.initPrinter(); // v1初始化
       }
-      return await isConnected();
+
+      final isConnectedStatus = await isConnected();
+      if (isConnectedStatus) {
+        await _setPageSize();
+      }
+
+      return isConnectedStatus;
     } catch (e) {
       print('IMin printer connect error: $e');
       return false;
     }
   }
+
+
 
   @override
   Future<void> disconnect() async {
@@ -52,7 +71,6 @@ class IMinPrinter implements RSPrinterInterface {
         return false;
       }
     }
-
     try {
       for (var element in elements) {
         bool result = false;
@@ -113,20 +131,16 @@ class IMinPrinter implements RSPrinterInterface {
       // 根据版本和 reverseBlackWhite 创建不同的样式
       if (_isV2) {
         // v2 版本：包含 space 属性
-        final textStyle = IminTextStyle(
+        final textStyle = IminTextPictureStyle(
           align: align,
           fontSize: fontSize,
-          space: 1.0, // v2 特有的 space 属性
+          // letterSpacing: 1.0,
           typeface: typeface,
           fontStyle: fontStyle,
           wordWrap: true,
+          reverseWhite: style.reverseBlackWhite,
         );
-
-        if (style.reverseBlackWhite) {
-          await _iminPrinter.printAntiWhiteText(text, style: textStyle);
-        } else {
-          await _iminPrinter.printText(text, style: textStyle);
-        }
+          await _iminPrinter.printTextBitmap(text, style: textStyle);
       } else {
         // v1 版本：不包含 space 属性
         final textStyle = IminTextStyle(
@@ -260,7 +274,10 @@ class IMinPrinter implements RSPrinterInterface {
     try {
       // 通过获取打印机状态判断是否连接
       final status = await _iminPrinter.getPrinterStatus();
-      return status?['code'] == 0; // 假设code=0为正常状态
+      if(status['code'] == '0'){
+        _setPageSize();
+      }
+      return status['code'] == '0'; // 假设code=0为正常状态
     } catch (e) {
       print('IMin check connection error: $e');
       return false;
@@ -301,23 +318,24 @@ class IMinPrinter implements RSPrinterInterface {
     }
   }
 
-  // 转换字体样式（自定义PrintStyle -> IminTypeface）
+  // 设置文字字体
   _convertTypeface(PrintStyle style) {
-    // 根据 isBold 和 isItalic 组合生成 typeface
-    IminTypeface typeface = IminTypeface.typefaceDefault;
-    if (style.isBold) {
-      typeface = IminTypeface.typefaceDefaultBold;
-    }
+    IminTypeface typeface = IminTypeface.typefaceDefaultBold;
     return typeface;
   }
 
+  // 设置文字样式
   _convertFontStyle(PrintStyle style) {
     IminFontStyle fontStyle = IminFontStyle.normal;
     if (style.isItalic && style.isBold) {
       fontStyle = IminFontStyle.boldItalic;
     } else if (style.isItalic) {
       fontStyle = IminFontStyle.italic;
-    }
+    } else if (style.isBold) {
+      fontStyle = IminFontStyle.bold;
+      }else {
+      fontStyle = IminFontStyle.normal;
+      }
     return fontStyle;
   }
 }
