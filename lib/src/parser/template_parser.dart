@@ -255,6 +255,11 @@ class TemplateParser {
     for (var row in document.findAllElements('row')) {
       final column = row.findElements('column').firstOrNull;
       if (column == null) continue;
+      // 自定义文字
+      if (column.getAttribute('type') == null) {
+        elements.add(_parseTextElement(row, column));
+        break;
+      }
 
       switch (column.getAttribute('type')) {
         case 'TEXT':
