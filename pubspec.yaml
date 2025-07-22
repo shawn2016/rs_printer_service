@@ -13,6 +13,7 @@ dependencies:
   imin_printer: ^0.6.11
   plugin_platform_interface: ^2.0.2
   xml: ^6.5.0
+  sunmi_printer_plus: ^4.1.0
 
 dev_dependencies:
   flutter_test:

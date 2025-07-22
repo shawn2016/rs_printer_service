@@ -278,6 +278,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.4.1"
+  sunmi_printer_plus:
+    dependency: transitive
+    description:
+      name: sunmi_printer_plus
+      sha256: "549fe76d8ed98a6be12137999be50ba809dc2fd354dfed03869197a45ad86be0"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "4.1.0"
   sync_http:
     dependency: transitive
     description:

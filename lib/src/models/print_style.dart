@@ -1,4 +1,4 @@
-enum FontSize { small, normal, large }
+enum FontSize { small, normal, large, xxxxxlarge,xxxxlarge,xxxlarge,xxlarge,xlarge }
 
 enum Alignment { left, center, right }
 

@@ -159,7 +159,6 @@ double getHeight(XmlElement column, double totalHeight) {
 //   return xml.trim();
 // }
 
-
 String renderTemplate(String tpl, Map<String, dynamic> data) {
   var xml = tpl;
 
@@ -171,37 +170,40 @@ String renderTemplate(String tpl, Map<String, dynamic> data) {
 
   // 1. 行级：剔除包着整行<row>的 <#if key??>…</#if>
   final rowIf = RegExp(
-      r'<#if\s+(\w+)\s*\?\?\s*>\s*(<row[\s\S]*?<\/row>)\s*<\/#if>'
+    r'<#if\s+(\w+)\s*\?\?\s*>\s*(<row[\s\S]*?<\/row>)\s*<\/#if>',
   );
   while (rowIf.hasMatch(xml)) {
     xml = xml.replaceAllMapped(rowIf, (m) {
       final key = m[1]!;
       final rowBlock = m[2]!;
       final value = data.containsKey(key) ? data[key] : null;
-      return (value != null && value.toString().trim().isNotEmpty) ? rowBlock : '';
+      return (value != null && value.toString().trim().isNotEmpty)
+          ? rowBlock
+          : '';
     });
   }
 
   // 2. 列级：剔除 column 内部的 <#if key??>…</#if>
-  xml = xml.replaceAllMapped(
-      RegExp(r'<column\b([^>]*)>([\s\S]*?)<\/column>'),
-          (m) {
-        final attrs = m[1]!;
-        var inner = m[2]!;
+  xml = xml.replaceAllMapped(RegExp(r'<column\b([^>]*)>([\s\S]*?)<\/column>'), (
+    m,
+  ) {
+    final attrs = m[1]!;
+    var inner = m[2]!;
 
-        final colIf = RegExp(r'<#if\s+(\w+)\s*\?\?\s*>([\s\S]*?)<\/#if>');
-        while (colIf.hasMatch(inner)) {
-          inner = inner.replaceAllMapped(colIf, (cm) {
-            final key = cm[1]!;
-            final content = cm[2]!;
-            final value = data.containsKey(key) ? data[key] : null;
-            return (value != null && value.toString().trim().isNotEmpty) ? content : '';
-          });
-        }
+    final colIf = RegExp(r'<#if\s+(\w+)\s*\?\?\s*>([\s\S]*?)<\/#if>');
+    while (colIf.hasMatch(inner)) {
+      inner = inner.replaceAllMapped(colIf, (cm) {
+        final key = cm[1]!;
+        final content = cm[2]!;
+        final value = data.containsKey(key) ? data[key] : null;
+        return (value != null && value.toString().trim().isNotEmpty)
+            ? content
+            : '';
+      });
+    }
 
-        return '<column$attrs>$inner</column>';
-      }
-  );
+    return '<column$attrs>$inner</column>';
+  });
 
   // 3. 处理默认值占位 ${key?default('xxx')}
   final defaultRe = RegExp(r"""\$\{(\w+)\?default\('([^']*)'\)\}""");
@@ -209,7 +211,9 @@ String renderTemplate(String tpl, Map<String, dynamic> data) {
     final key = m[1]!;
     final def = m[2]!;
     final value = data.containsKey(key) ? data[key] : null;
-    return (value != null && value.toString().trim().isNotEmpty) ? value.toString() : def;
+    return (value != null && value.toString().trim().isNotEmpty)
+        ? value.toString()
+        : def;
   });
 
   // 4. 处理普通占位 ${key}
@@ -217,7 +221,9 @@ String renderTemplate(String tpl, Map<String, dynamic> data) {
   xml = xml.replaceAllMapped(varRe, (m) {
     final key = m[1]!;
     final value = data.containsKey(key) ? data[key] : null;
-    return (value != null && value.toString().trim().isNotEmpty) ? value.toString() : '';
+    return (value != null && value.toString().trim().isNotEmpty)
+        ? value.toString()
+        : '';
   });
 
   // 修复：清理空标签时保留 LINE/BLANK 类型的 column
@@ -238,27 +244,26 @@ String renderTemplate(String tpl, Map<String, dynamic> data) {
 class TemplateParser {
   static double totalWidth = 0;
   static double totalHeight = 0;
+
   /// 解析渲染后的纯 XML
   static List<PrintElement> parse(
     String templateXml,
     Map<String, dynamic> data,
-      int pageSize
+    int pageSize,
   ) {
-
     totalWidth = pageSize.toDouble();
     totalHeight = pageSize.toDouble();
     final rendered = renderTemplate(templateXml, data);
 
     final elements = <PrintElement>[];
     final document = XmlDocument.parse(rendered);
-
     for (var row in document.findAllElements('row')) {
       final column = row.findElements('column').firstOrNull;
       if (column == null) continue;
       // 自定义文字
       if (column.getAttribute('type') == null) {
         elements.add(_parseTextElement(row, column));
-        break;
+        continue;
       }
 
       switch (column.getAttribute('type')) {
@@ -327,14 +332,13 @@ class TemplateParser {
     final data = column.text.trim();
     final style = _parsePrintStyle(row, column);
 
-
     final width = getWidth(column, totalWidth);
     final height = getHeight(column, totalHeight);
 
     return QrCodeElement(
       data: data,
-      width: width*10,
-      height: height*10,
+      width: width * 10,
+      height: height * 10,
       style: style,
     );
   }
@@ -382,12 +386,22 @@ class TemplateParser {
 
   static FontSize _parseFontSize(String value) {
     switch (value) {
-      case 'small':
+      case 'small': // 1
         return FontSize.small;
-      case 'large':
+      case 'xxxxxlarge': // 8
+        return FontSize.xxxxxlarge;
+      case 'xxxxlarge': // 7
+        return FontSize.xxxxlarge;
+      case 'xxxlarge': // 6
+        return FontSize.xxxlarge;
+      case 'xxlarge': // 5
+        return FontSize.xxlarge;
+      case 'xlarge': // 4
+        return FontSize.xlarge;
+      case 'large': // 3
         return FontSize.large;
       default:
-        return FontSize.normal;
+        return FontSize.normal; // 2
     }
   }
 
