@@ -12,6 +12,7 @@ class IMinPrinterV1 implements RSPrinterInterface {
   IMinPrinterV1({
     this.paperSize = 58, // 默认值
   });
+  int get _charsPerLine => paperSize == 58 ? 32 : 48;
 
   // 设置纸张大小
   Future<void> _setPageSize() async {
@@ -141,20 +142,28 @@ class IMinPrinterV1 implements RSPrinterInterface {
     try {
       final align = _convertAlignment(style.alignment);
       final qrSize = (width / 30).clamp(1, 10).toInt();
-      await _printAndFeedPaper(20);
-
-
+      _iminPrinter.setTextLineSpacing(0.01);
+     await _iminPrinter.printText(" ",   style: IminTextStyle(
+        align: IminPrintAlign.left,
+        space: 0.01,
+        fontSize: _convertFontSize(FontSize.normal),
+        fontStyle: IminFontStyle.bold,
+        typeface: IminTypeface.typefaceDefaultBold,
+        wordWrap: false,
+      ));
         // 直接调用方法，不获取返回值
-        _iminPrinter.setQrCodeSize(9);
+        _iminPrinter.setQrCodeSize(qrSize);
         await _iminPrinter.printQrCode(
           data,
           qrCodeStyle: IminQrCodeStyle(
             align: align,
             qrSize: qrSize,
+            leftMargin: 0,
             errorCorrectionLevel: IminQrcodeCorrectionLevel.levelH,
           ),
         );
-      await _printAndFeedPaper(20);
+      await _printAndFeedPaper(10);
+
 
       // 无异常则视为成功
       return true;
@@ -164,54 +173,67 @@ class IMinPrinterV1 implements RSPrinterInterface {
     }
   }
 
-  _printSolidLine() async {
-
+  // 实现实线
+  Future<void> _printSolidLine() async {
+    final count = 16;
+    final line = ''.padRight(count, '─');
+    await _iminPrinter.printText(
+      line,
+      style: IminTextStyle(
+        align: IminPrintAlign.left,
+        fontSize: _convertFontSize(FontSize.normal),
+        fontStyle: IminFontStyle.normal,
+        typeface: IminTypeface.typefaceDefault,
+        wordWrap: false,
+      ),
+    );
   }
 
-  _printDottedLine() async {
-    const List<int> ESC = [0x1B];
-
-    // 1. 开启双倍高度和宽度模式
-    List<int> setDoubleSize = [...ESC, 0x21, 0x00]; // ESC ! 0x11 (双倍高度+宽度)
-
-    // 2. 打印一条由连字符组成的粗线
-    List<int> lineChars = List.filled(32, 0x2D); // 32个连字符（-）
-
-    // 3. 关闭双倍大小模式
-    List<int> resetDoubleSize = [...ESC, 0x21, 0x00]; // ESC ! 0x00 (重置)
-
-    // 4. 换行
-    List<int> lineFeed = [0x0A];
-
-    Uint8List data = Uint8List.fromList([
-      ...setDoubleSize,
-      ...lineChars,
-      ...resetDoubleSize,
-      ...lineFeed,
-    ]);
-
-    _iminPrinter.sendRAWData(data);
+  // 实现粗实线（使用等宽符号或加粗样式）
+  Future<void> _printBoldSolidLine() async {
+    final count =  16;
+    final line = ''.padRight(count, '━'); // 可改成'━'等字符
+    await _iminPrinter.printText(
+      line,
+      style: IminTextStyle(
+        align: IminPrintAlign.left,
+        fontSize: _convertFontSize(FontSize.normal),
+        fontStyle: IminFontStyle.bold,
+        typeface: IminTypeface.typefaceDefaultBold,
+        wordWrap: false,
+      ),
+    );
+  }
+//  实线（细）：─ (U+2500)
+//
+//  实线（粗）：━ (U+2501)
+//
+//  虚线（细）：┄ (U+2504) 或 ┈ (U+2508)
+//
+//  虚线（粗）：┅ (U+2505) 或 ┉ (U+2509)
+//
+//  双线：═ (U+2550)，竖线双：║ (U+2551)
+  // 实现虚线
+  Future<void> _printDottedLine() async {
+    // final count =16;
+    // final buffer = StringBuffer();
+    // for (int i = 0; i < count; i++) {
+    //   buffer.write('┄');
+    // }
+    final count =  16;
+    final line = ''.padRight(count, '┄'); // 可改成'━'等字符
+    await _iminPrinter.printText(
+      line,
+      style: IminTextStyle(
+        align: IminPrintAlign.left,
+        fontSize: _convertFontSize(FontSize.normal),
+        fontStyle: IminFontStyle.normal,
+        typeface: IminTypeface.typefaceDefault,
+        wordWrap: false,
+      ),
+    );
   }
 
-  _printBoldSolidLine() async {
-    const List<int> ESC = [0x1B];
-
-    List<int> data = [];
-
-    // 开启双线下划线
-    data.addAll([...ESC, 0x2D, 0x02]);
-
-    // 打印一整排空格（按打印机纸宽调整，一般是 32、42、48、64）
-    data.addAll(List.filled(32, 0x20)); // 比如 48 字符宽度打印机
-
-    // 关闭下划线
-    data.addAll([...ESC, 0x2D, 0x00]);
-
-    // 换行
-    data.add(0x0A);
-
-    await _iminPrinter.sendRAWData(Uint8List.fromList(data));
-  }
 
   @override
   Future<bool> printLine(LineStyle style) async {

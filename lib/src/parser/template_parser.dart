@@ -285,41 +285,6 @@ class TemplateParser {
     return elements;
   }
 
-  // static List<PrintElement> parse(String templateXml) {
-  //   try {
-  //     final elements = <PrintElement>[];
-  //     final document = XmlDocument.parse(templateXml);
-  //
-  //     // 解析receipt节点下的所有row
-  //     for (var row in document.findAllElements('row')) {
-  //       final column = row
-  //           .findElements('column')
-  //           .firstOrNull;
-  //       if (column == null) continue;
-  //
-  //       final type = column.getAttribute('type');
-  //       switch (type) {
-  //         case 'TEXT':
-  //           elements.add(_parseTextElement(row, column));
-  //           break;
-  //         case 'QR_CODE':
-  //           elements.add(_parseQrCodeElement(row, column));
-  //           break;
-  //         case 'LINE':
-  //           elements.add(_parseLineElement(row, column));
-  //           break;
-  //         case 'BLANK':
-  //           elements.add(_parseBlankElement(row, column));
-  //           break;
-  //       }
-  //     }
-  //
-  //     return elements;
-  //   } catch (e) {
-  //     print('Parse template error: $e');
-  //     return [];
-  //   }
-  // }
 
   static TextElement _parseTextElement(XmlElement row, XmlElement column) {
     final content = column.text.trim();
