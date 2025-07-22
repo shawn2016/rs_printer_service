@@ -93,7 +93,7 @@ class IMinPrinterV2 implements RSPrinterInterface {
   @override
   Future<bool> printText(String text, PrintStyle style) async {
     try {
-      // IminTextStyle 相关API:
+      // IminTextPictureStyle 相关API:
 
       // 属性	说明	类型	默认值
       // √ wordWrap	打印文字内容是否加入\n, true或者不设置自动加\n, 为false不加\n	bool	无

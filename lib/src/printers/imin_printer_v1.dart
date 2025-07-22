@@ -113,18 +113,11 @@ class IMinPrinterV1 implements RSPrinterInterface {
           align: align,
           fontSize: fontSize,
           fontStyle: fontStyle,
-          // typeface: typeface,
-          wordWrap: true,
+          typeface: typeface,
+          wordWrap: false,
         );
-        // 设置行间距
-        _iminPrinter.setTextLineSpacing(0.01);
-        _iminPrinter.setTextSize(fontSize);
-        _iminPrinter.setAlignment(align);
-        _iminPrinter.setTextWidth(580);
-        _iminPrinter.setTextTypeface(typeface);
-        _iminPrinter.setTextStyle(fontStyle);
         if (style.reverseBlackWhite) {
-          await _iminPrinter.printAntiWhiteText(text);
+          await _iminPrinter.printAntiWhiteText(text,style: textStyle);
         } else {
           await _iminPrinter.printText(text, style: textStyle);
 
