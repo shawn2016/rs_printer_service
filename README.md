@@ -1,15 +1,19 @@
 # rs_printer_service
 
-A new Flutter plugin project.
-
-## Getting Started
-
-This project is a starting point for a Flutter
-[plug-in package](https://flutter.dev/to/develop-plugins),
-a specialized package that includes platform-specific implementation code for
-Android and/or iOS.
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-
+### local_packages/imin_printer-0.6.13
+> 这个只改了一个文件,
+> Swift 1 打印机使用黑底白字（printAntiWhiteText）时多输出一个换行符（sdk 1.0.0存在 2.0.0 不存在）
+> 已提出issue，等待官方修复 [https://github.com/iminsoftware/imin_printer/issues/24]
+```java
+  case "printAntiWhiteText":
+                String whiteText = call.argument("text");
+                if (iminPrintUtils != null) {
+                    if(sdkVersion.equals("1.0.0")) {
+                        iminPrintUtils.printAntiWhiteText(whiteText);
+                    } else {
+                        iminPrintUtils.printAntiWhiteText(whiteText + "\n");
+                    }
+                }
+                result.success(true);
+                break;
+```
