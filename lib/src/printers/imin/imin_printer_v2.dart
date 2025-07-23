@@ -1,29 +1,33 @@
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
+
 import 'package:imin_printer/imin_printer.dart';
 import 'package:imin_printer/enums.dart';
 import 'package:imin_printer/imin_style.dart';
-import '../models/print_element.dart';
-import '../models/print_style.dart';
-import 'printer_interface.dart';
+import '../../models/print_element.dart';
+import '../../utils/_convertFontSize.dart';
+import '../../models/print_element.dart';
+import '../../models/print_style.dart';
+import '../../utils/_convertFontSize.dart';
+import '../printer_interface.dart';
 
-class IMinPrinterV1 implements RSPrinterInterface {
+class IMinPrinterV2 implements RSPrinterInterface {
   final IminPrinter _iminPrinter = IminPrinter();
   int paperSize = 58; // 默认纸张大小
-  IMinPrinterV1({
+  IMinPrinterV2({
     this.paperSize = 58, // 默认值
   });
-  int get _charsPerLine => paperSize == 58 ? 32 : 48;
 
   // 设置纸张大小
   Future<void> _setPageSize() async {
     await _iminPrinter.setPageFormat(style: paperSize);
   }
 
+
   @override
   Future<bool> connect() async {
     try {
       // 根据版本初始化打印机
-      await _iminPrinter.initPrinter(); // v1初始化
+      await _iminPrinter.initPrinterParams();
       final isConnectedStatus = await isConnected();
       if (isConnectedStatus) {
         await _setPageSize();
@@ -31,16 +35,15 @@ class IMinPrinterV1 implements RSPrinterInterface {
 
       return isConnectedStatus;
     } catch (e) {
-      if (kDebugMode) {
-        print('IMin printer connect error: $e');
-      }
+      print('IMin printer connect error: $e');
       return false;
     }
   }
 
   @override
   Future<void> disconnect() async {
-  // TODO : implement disconnect
+      await _iminPrinter.unBindService(); // v2断开服务
+    // v1无明确disconnect方法，仅初始化相反操作
   }
 
   @override
@@ -77,12 +80,12 @@ class IMinPrinterV1 implements RSPrinterInterface {
             result = await printBlank((element as BlankElement).count);
             break;
         }
+        print('result: $result');
         if (!result) return false;
       }
       // 打印完成后走纸+切纸
       await _printAndFeedPaper(70);
-
-        _iminPrinter.printAndLineFeed();
+      await _partialCut();
       return true;
     } catch (e) {
       print('IMin print elements error: $e');
@@ -93,7 +96,7 @@ class IMinPrinterV1 implements RSPrinterInterface {
   @override
   Future<bool> printText(String text, PrintStyle style) async {
     try {
-      // IminTextStyle 相关API:
+      // IminTextPictureStyle 相关API:
 
       // 属性	说明	类型	默认值
       // √ wordWrap	打印文字内容是否加入\n, true或者不设置自动加\n, 为false不加\n	bool	无
@@ -104,25 +107,26 @@ class IMinPrinterV1 implements RSPrinterInterface {
       // √  fontStyle	打印文字样式	IminFontStyle	无
       // √  align	打印文字对齐方式	IminPrintAlign	无
       final align = _convertAlignment(style.alignment);
-      final fontSize = _convertFontSize(style.fontSize);
+      final fontSize = convertFontSize(style.fontSize);
       final typeface = _convertTypeface(style);
       final fontStyle = _convertFontStyle(style);
 
       // 根据版本和 reverseBlackWhite 创建不同的样式
-
-        final textStyle = IminTextStyle(
+        // v2 版本：包含 space 属性
+        final textStyle = IminTextPictureStyle(
           align: align,
           fontSize: fontSize,
-          fontStyle: fontStyle,
+          underline:false, // 下划线
+          throughline: false, // 删除线
+          lineHeight: 0.85, // 行间距
+          // letterSpacing: 1.0,
           typeface: typeface,
-          wordWrap: false,
+          fontStyle: fontStyle,
+          wordWrap: true,
+          reverseWhite: style.reverseBlackWhite,
         );
-        if (style.reverseBlackWhite) {
-          await _iminPrinter.printAntiWhiteText(text,style: textStyle);
-        } else {
-          await _iminPrinter.printText(text, style: textStyle);
+        await _iminPrinter.printTextBitmap(text, style: textStyle);
 
-        }
 
       return true;
     } catch (e) {
@@ -142,28 +146,19 @@ class IMinPrinterV1 implements RSPrinterInterface {
     try {
       final align = _convertAlignment(style.alignment);
       final qrSize = (width / 30).clamp(1, 10).toInt();
-      _iminPrinter.setTextLineSpacing(0.01);
-     await _iminPrinter.printText(" ",   style: IminTextStyle(
-        align: IminPrintAlign.left,
-        space: 0.01,
-        fontSize: _convertFontSize(FontSize.normal),
-        fontStyle: IminFontStyle.bold,
-        typeface: IminTypeface.typefaceDefaultBold,
-        wordWrap: false,
-      ));
+      await _printAndFeedPaper(20);
+
         // 直接调用方法，不获取返回值
-        _iminPrinter.setQrCodeSize(qrSize);
         await _iminPrinter.printQrCode(
           data,
           qrCodeStyle: IminQrCodeStyle(
             align: align,
             qrSize: qrSize,
-            leftMargin: 0,
             errorCorrectionLevel: IminQrcodeCorrectionLevel.levelH,
           ),
         );
-      await _printAndFeedPaper(10);
 
+      await _printAndFeedPaper(20);
 
       // 无异常则视为成功
       return true;
@@ -173,67 +168,65 @@ class IMinPrinterV1 implements RSPrinterInterface {
     }
   }
 
-  // 实现实线
-  Future<void> _printSolidLine() async {
-    final count = 16;
-    final line = ''.padRight(count, '─');
-    await _iminPrinter.printText(
-      line,
-      style: IminTextStyle(
-        align: IminPrintAlign.left,
-        fontSize: _convertFontSize(FontSize.normal),
-        fontStyle: IminFontStyle.normal,
-        typeface: IminTypeface.typefaceDefault,
-        wordWrap: false,
-      ),
-    );
+  _printSolidLine() async {
+      const List<int> ESC = [0x1B];
+      List<int> openUnderline = [...ESC, 0x2D, 0x01];
+      List<int> spaces = List.filled(32, 0x20); // 32 个空格
+      List<int> closeUnderline = [...ESC, 0x2D, 0x00];
+      List<int> lineFeed = [0x0A];
+      Uint8List data = Uint8List.fromList([
+        ...openUnderline,
+        ...spaces,
+        ...closeUnderline,
+        ...lineFeed,
+      ]);
+      _iminPrinter.sendRAWData(data);
   }
 
-  // 实现粗实线（使用等宽符号或加粗样式）
-  Future<void> _printBoldSolidLine() async {
-    final count =  16;
-    final line = ''.padRight(count, '━'); // 可改成'━'等字符
-    await _iminPrinter.printText(
-      line,
-      style: IminTextStyle(
-        align: IminPrintAlign.left,
-        fontSize: _convertFontSize(FontSize.normal),
-        fontStyle: IminFontStyle.bold,
-        typeface: IminTypeface.typefaceDefaultBold,
-        wordWrap: false,
-      ),
-    );
-  }
-//  实线（细）：─ (U+2500)
-//
-//  实线（粗）：━ (U+2501)
-//
-//  虚线（细）：┄ (U+2504) 或 ┈ (U+2508)
-//
-//  虚线（粗）：┅ (U+2505) 或 ┉ (U+2509)
-//
-//  双线：═ (U+2550)，竖线双：║ (U+2551)
-  // 实现虚线
-  Future<void> _printDottedLine() async {
-    // final count =16;
-    // final buffer = StringBuffer();
-    // for (int i = 0; i < count; i++) {
-    //   buffer.write('┄');
-    // }
-    final count =  16;
-    final line = ''.padRight(count, '┄'); // 可改成'━'等字符
-    await _iminPrinter.printText(
-      line,
-      style: IminTextStyle(
-        align: IminPrintAlign.left,
-        fontSize: _convertFontSize(FontSize.normal),
-        fontStyle: IminFontStyle.normal,
-        typeface: IminTypeface.typefaceDefault,
-        wordWrap: false,
-      ),
-    );
+  _printDottedLine() async {
+    const List<int> ESC = [0x1B];
+
+    // 1. 开启双倍高度和宽度模式
+    List<int> setDoubleSize = [...ESC, 0x21, 0x00]; // ESC ! 0x11 (双倍高度+宽度)
+
+    // 2. 打印一条由连字符组成的粗线
+    List<int> lineChars = List.filled(32, 0x2D); // 32个连字符（-）
+
+    // 3. 关闭双倍大小模式
+    List<int> resetDoubleSize = [...ESC, 0x21, 0x00]; // ESC ! 0x00 (重置)
+
+    // 4. 换行
+    List<int> lineFeed = [0x0A];
+
+    Uint8List data = Uint8List.fromList([
+      ...setDoubleSize,
+      ...lineChars,
+      ...resetDoubleSize,
+      ...lineFeed,
+    ]);
+
+    _iminPrinter.sendRAWData(data);
   }
 
+  _printBoldSolidLine() async {
+    const List<int> ESC = [0x1B];
+
+    List<int> data = [];
+
+    // 开启双线下划线
+    data.addAll([...ESC, 0x2D, 0x02]);
+
+    // 打印一整排空格（按打印机纸宽调整，一般是 32、42、48、64）
+    data.addAll(List.filled(32, 0x20)); // 比如 48 字符宽度打印机
+
+    // 关闭下划线
+    data.addAll([...ESC, 0x2D, 0x00]);
+
+    // 换行
+    data.add(0x0A);
+
+    await _iminPrinter.sendRAWData(Uint8List.fromList(data));
+  }
 
   @override
   Future<bool> printLine(LineStyle style) async {
@@ -305,6 +298,10 @@ class IMinPrinterV1 implements RSPrinterInterface {
     await _iminPrinter.printAndFeedPaper(distance);
   }
 
+  // 辅助方法：部分切纸
+  Future<void> _partialCut() async {
+    await _iminPrinter.partialCut();
+  }
 
   // 转换对齐方式（自定义Align -> IminPrintAlign）
   IminPrintAlign _convertAlignment(Alignment alignment) {
@@ -318,27 +315,7 @@ class IMinPrinterV1 implements RSPrinterInterface {
     }
   }
 
-  // 转换字体大小（自定义FontSize -> 数值）
-  int _convertFontSize(FontSize fontSize) {
-    switch (fontSize) {
-      case FontSize.small:
-        return 20;
-      case FontSize.large:
-        return 28;
-      case FontSize.xlarge:
-        return 36;
-      case FontSize.xxlarge:
-        return 42;
-      case FontSize.xxxlarge:
-        return 56;
-      case FontSize.xxxxlarge:
-        return 64;
-      case FontSize.xxxxxlarge:
-        return 72;
-      default: // normal
-        return 24;
-    }
-  }
+
 
   // 设置文字字体
   _convertTypeface(PrintStyle style) {

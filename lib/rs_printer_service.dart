@@ -2,9 +2,10 @@
 import 'package:flutter/foundation.dart';
 
 import 'src/parser/template_parser.dart';
-import 'src/printers/imin_printer_v1.dart';
-import 'src/printers/imin_printer_v2.dart';
+import 'src/printers/imin/imin_printer_v1.dart';
+import 'src/printers/imin/imin_printer_v2.dart';
 import 'src/printers/printer_interface.dart';
+import 'src/printers/sunmi/sunmi_printer.dart';
 import 'src/utils/PrinterDetector.dart';
 
 enum PrinterType { // iMin系列
@@ -78,6 +79,9 @@ class RSPrinterService {
         );
         break;
       case PrinterType.sunmi:
+        _printer = SunmiPrinter(
+            paperSize: paperSize
+            );
         break;
         default:
         break;

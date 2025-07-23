@@ -52,8 +52,7 @@ class _MyAppState extends State<MyApp> {
                   String templateXml = "";
                   Future<dynamic> fetchPrintTemplate() async {
                     final headers = {
-                      'vulcan-token':
-                          'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJsb2dpblR5cGUiOiJsb2dpbiIsImxvZ2luSWQiOiJob25neXVhbiIsInJuU3RyIjoiVW9GbGtlRkxyQ21qeXZYbEtYVzFMTDY5bE9wQlNUc3UiLCJ1c2VyTmFtZSI6Iui1tea0qua6kCJ9.RxXSeKpPikj3rAxA4b8wNrZS8zgpEspm82dpcfmvpRE',
+                      'vulcan-token':'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJsb2dpblR5cGUiOiJsb2dpbiIsImxvZ2luSWQiOiJob25neXVhbiIsInJuU3RyIjoiUE9NYkgxbmUxRFRwcVZvSnEyTXdkVXdQNDBlWnN3Q1QiLCJ1c2VyTmFtZSI6Iui1tea0qua6kCJ9.-2GD6qMQ2E5IUk1Gb6bkY20FYGVBMz9F5g540egIKhE',
                       'corporation-id': '256',
                       'organization-id': '1768172655514521601',
                       'organization-type': '7',
