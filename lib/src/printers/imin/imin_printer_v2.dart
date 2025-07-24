@@ -9,10 +9,11 @@ import '../../models/print_element.dart';
 import '../../models/print_style.dart';
 import '../../utils/_convertFontSize.dart';
 import '../printer_interface.dart';
+import 'common.dart';
 
 class IMinPrinterV2 implements RSPrinterInterface {
   final IminPrinter _iminPrinter = IminPrinter();
-  int paperSize = 58; // 默认纸张大小
+  int? paperSize = 58; // 默认纸张大小
   IMinPrinterV2({
     this.paperSize = 58, // 默认值
   });
@@ -21,7 +22,6 @@ class IMinPrinterV2 implements RSPrinterInterface {
   Future<void> _setPageSize() async {
     await _iminPrinter.setPageFormat(style: paperSize);
   }
-
 
   @override
   Future<bool> connect() async {
@@ -42,8 +42,7 @@ class IMinPrinterV2 implements RSPrinterInterface {
 
   @override
   Future<void> disconnect() async {
-      await _iminPrinter.unBindService(); // v2断开服务
-    // v1无明确disconnect方法，仅初始化相反操作
+    await _iminPrinter.unBindService(); // v2断开服务
   }
 
   @override
@@ -106,27 +105,26 @@ class IMinPrinterV2 implements RSPrinterInterface {
       // √  typeface	打印文字字体	IminTypeface	无
       // √  fontStyle	打印文字样式	IminFontStyle	无
       // √  align	打印文字对齐方式	IminPrintAlign	无
-      final align = _convertAlignment(style.alignment);
+      final align = convertAlignment(style.alignment);
       final fontSize = convertFontSize(style.fontSize);
-      final typeface = _convertTypeface(style);
-      final fontStyle = _convertFontStyle(style);
+      final typeface = convertTypeface(style);
+      final fontStyle = convertFontStyle(style);
 
       // 根据版本和 reverseBlackWhite 创建不同的样式
-        // v2 版本：包含 space 属性
-        final textStyle = IminTextPictureStyle(
-          align: align,
-          fontSize: fontSize,
-          underline:false, // 下划线
-          throughline: false, // 删除线
-          lineHeight: 0.85, // 行间距
-          // letterSpacing: 1.0,
-          typeface: typeface,
-          fontStyle: fontStyle,
-          wordWrap: true,
-          reverseWhite: style.reverseBlackWhite,
-        );
-        await _iminPrinter.printTextBitmap(text, style: textStyle);
-
+      // v2 版本：包含 space 属性
+      final textStyle = IminTextPictureStyle(
+        align: align,
+        fontSize: fontSize,
+        underline: false, // 下划线
+        throughline: false, // 删除线
+        lineHeight: 0.85, // 行间距
+        // letterSpacing: 1.0,
+        typeface: typeface,
+        fontStyle: fontStyle,
+        wordWrap: true,
+        reverseWhite: style.reverseBlackWhite,
+      );
+      await _iminPrinter.printTextBitmap(text, style: textStyle);
 
       return true;
     } catch (e) {
@@ -144,19 +142,19 @@ class IMinPrinterV2 implements RSPrinterInterface {
     PrintStyle style,
   ) async {
     try {
-      final align = _convertAlignment(style.alignment);
+      final align = convertAlignment(style.alignment);
       final qrSize = (width / 30).clamp(1, 10).toInt();
       await _printAndFeedPaper(20);
 
-        // 直接调用方法，不获取返回值
-        await _iminPrinter.printQrCode(
-          data,
-          qrCodeStyle: IminQrCodeStyle(
-            align: align,
-            qrSize: qrSize,
-            errorCorrectionLevel: IminQrcodeCorrectionLevel.levelH,
-          ),
-        );
+      // 直接调用方法，不获取返回值
+      await _iminPrinter.printQrCode(
+        data,
+        qrCodeStyle: IminQrCodeStyle(
+          align: align,
+          qrSize: qrSize,
+          errorCorrectionLevel: IminQrcodeCorrectionLevel.levelH,
+        ),
+      );
 
       await _printAndFeedPaper(20);
 
@@ -169,18 +167,18 @@ class IMinPrinterV2 implements RSPrinterInterface {
   }
 
   _printSolidLine() async {
-      const List<int> ESC = [0x1B];
-      List<int> openUnderline = [...ESC, 0x2D, 0x01];
-      List<int> spaces = List.filled(32, 0x20); // 32 个空格
-      List<int> closeUnderline = [...ESC, 0x2D, 0x00];
-      List<int> lineFeed = [0x0A];
-      Uint8List data = Uint8List.fromList([
-        ...openUnderline,
-        ...spaces,
-        ...closeUnderline,
-        ...lineFeed,
-      ]);
-      _iminPrinter.sendRAWData(data);
+    const List<int> ESC = [0x1B];
+    List<int> openUnderline = [...ESC, 0x2D, 0x01];
+    List<int> spaces = List.filled(32, 0x20); // 32 个空格
+    List<int> closeUnderline = [...ESC, 0x2D, 0x00];
+    List<int> lineFeed = [0x0A];
+    Uint8List data = Uint8List.fromList([
+      ...openUnderline,
+      ...spaces,
+      ...closeUnderline,
+      ...lineFeed,
+    ]);
+    _iminPrinter.sendRAWData(data);
   }
 
   _printDottedLine() async {
@@ -301,40 +299,5 @@ class IMinPrinterV2 implements RSPrinterInterface {
   // 辅助方法：部分切纸
   Future<void> _partialCut() async {
     await _iminPrinter.partialCut();
-  }
-
-  // 转换对齐方式（自定义Align -> IminPrintAlign）
-  IminPrintAlign _convertAlignment(Alignment alignment) {
-    switch (alignment) {
-      case Alignment.center:
-        return IminPrintAlign.center;
-      case Alignment.right:
-        return IminPrintAlign.right;
-      default:
-        return IminPrintAlign.left;
-    }
-  }
-
-
-
-  // 设置文字字体
-  _convertTypeface(PrintStyle style) {
-    IminTypeface typeface = IminTypeface.typefaceDefaultBold;
-    return typeface;
-  }
-
-  // 设置文字样式
-  _convertFontStyle(PrintStyle style) {
-    IminFontStyle fontStyle = IminFontStyle.normal;
-    if (style.isItalic && style.isBold) {
-      fontStyle = IminFontStyle.boldItalic;
-    } else if (style.isItalic) {
-      fontStyle = IminFontStyle.italic;
-    } else if (style.isBold) {
-      fontStyle = IminFontStyle.bold;
-    } else {
-      fontStyle = IminFontStyle.normal;
-    }
-    return fontStyle;
   }
 }

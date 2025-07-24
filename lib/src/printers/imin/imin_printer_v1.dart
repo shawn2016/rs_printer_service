@@ -6,14 +6,14 @@ import '../../models/print_element.dart';
 import '../../models/print_style.dart';
 import '../../utils/_convertFontSize.dart';
 import '../printer_interface.dart';
+import 'common.dart';
 
 class IMinPrinterV1 implements RSPrinterInterface {
   final IminPrinter _iminPrinter = IminPrinter();
-  int paperSize = 58; // 默认纸张大小
+  int? paperSize = 58; // 默认纸张大小
   IMinPrinterV1({
     this.paperSize = 58, // 默认值
   });
-  int get _charsPerLine => paperSize == 58 ? 32 : 48;
 
   // 设置纸张大小
   Future<void> _setPageSize() async {
@@ -40,9 +40,7 @@ class IMinPrinterV1 implements RSPrinterInterface {
   }
 
   @override
-  Future<void> disconnect() async {
-  // TODO : implement disconnect
-  }
+  Future<void> disconnect() async {}
 
   @override
   Future<bool> printElements(List<PrintElement> elements) async {
@@ -83,7 +81,7 @@ class IMinPrinterV1 implements RSPrinterInterface {
       // 打印完成后走纸+切纸
       await _printAndFeedPaper(70);
 
-        _iminPrinter.printAndLineFeed();
+      _iminPrinter.printAndLineFeed();
       return true;
     } catch (e) {
       print('IMin print elements error: $e');
@@ -104,27 +102,26 @@ class IMinPrinterV1 implements RSPrinterInterface {
       // √  typeface	打印文字字体	IminTypeface	无
       // √  fontStyle	打印文字样式	IminFontStyle	无
       // √  align	打印文字对齐方式	IminPrintAlign	无
-      final align = _convertAlignment(style.alignment);
+      final align = convertAlignment(style.alignment);
       final fontSize = convertFontSize(style.fontSize);
-      final typeface = _convertTypeface(style);
-      final fontStyle = _convertFontStyle(style);
+      final typeface = convertTypeface(style);
+      final fontStyle = convertFontStyle(style);
 
       // 根据版本和 reverseBlackWhite 创建不同的样式
 
-        final textStyle = IminTextStyle(
-          align: align,
-          space: 0.85,
-          fontSize: fontSize,
-          fontStyle: fontStyle,
-          typeface: typeface,
-          wordWrap: false,
-        );
-        if (style.reverseBlackWhite) {
-          await _iminPrinter.printAntiWhiteText(text,style: textStyle);
-        } else {
-          await _iminPrinter.printText(text, style: textStyle);
-
-        }
+      final textStyle = IminTextStyle(
+        align: align,
+        space: 0.85,
+        fontSize: fontSize,
+        fontStyle: fontStyle,
+        typeface: typeface,
+        wordWrap: false,
+      );
+      if (style.reverseBlackWhite) {
+        await _iminPrinter.printAntiWhiteText(text, style: textStyle);
+      } else {
+        await _iminPrinter.printText(text, style: textStyle);
+      }
 
       return true;
     } catch (e) {
@@ -142,31 +139,33 @@ class IMinPrinterV1 implements RSPrinterInterface {
     PrintStyle style,
   ) async {
     try {
-      final align = _convertAlignment(style.alignment);
+      final align = convertAlignment(style.alignment);
       final qrSize = (width / 30).clamp(1, 10).toInt();
       _iminPrinter.setTextLineSpacing(0.01);
-     await _iminPrinter.printText(" ",   style: IminTextStyle(
-        align: IminPrintAlign.left,
-        space: 0.01,
-        fontSize: convertFontSize(FontSize.normal),
-        fontStyle: IminFontStyle.bold,
-        typeface: IminTypeface.typefaceDefaultBold,
-        wordWrap: false,
-      ));
-        // 直接调用方法，不获取返回值
-        _iminPrinter.setQrCodeSize(qrSize);
-        await _iminPrinter.printQrCode(
-          data,
-          qrCodeStyle: IminQrCodeStyle(
-            align: align,
-            qrSize: qrSize,
-            leftMargin: 0,
-            errorCorrectionLevel: IminQrcodeCorrectionLevel.levelH,
-          ),
-        );
+      //  为了解决打印时二维码上文字出现横线会跑到二维码下面的问题
+      await _iminPrinter.printText(
+        " ",
+        style: IminTextStyle(
+          align: IminPrintAlign.left,
+          space: 0.01,
+          fontSize: convertFontSize(FontSize.normal),
+          fontStyle: IminFontStyle.bold,
+          typeface: IminTypeface.typefaceDefaultBold,
+          wordWrap: false,
+        ),
+      );
+      // 直接调用方法，不获取返回值
+      _iminPrinter.setQrCodeSize(qrSize);
+      await _iminPrinter.printQrCode(
+        data,
+        qrCodeStyle: IminQrCodeStyle(
+          align: align,
+          qrSize: qrSize,
+          leftMargin: 0,
+          errorCorrectionLevel: IminQrcodeCorrectionLevel.levelH,
+        ),
+      );
       await _printAndFeedPaper(10);
-
-
       // 无异常则视为成功
       return true;
     } catch (e) {
@@ -193,7 +192,7 @@ class IMinPrinterV1 implements RSPrinterInterface {
 
   // 实现粗实线（使用等宽符号或加粗样式）
   Future<void> _printBoldSolidLine() async {
-    final count =  16;
+    final count = 16;
     final line = ''.padRight(count, '━'); // 可改成'━'等字符
     await _iminPrinter.printText(
       line,
@@ -206,15 +205,16 @@ class IMinPrinterV1 implements RSPrinterInterface {
       ),
     );
   }
-//  实线（细）：─ (U+2500)
-//
-//  实线（粗）：━ (U+2501)
-//
-//  虚线（细）：┄ (U+2504) 或 ┈ (U+2508)
-//
-//  虚线（粗）：┅ (U+2505) 或 ┉ (U+2509)
-//
-//  双线：═ (U+2550)，竖线双：║ (U+2551)
+
+  //  实线（细）：─ (U+2500)
+  //
+  //  实线（粗）：━ (U+2501)
+  //
+  //  虚线（细）：┄ (U+2504) 或 ┈ (U+2508)
+  //
+  //  虚线（粗）：┅ (U+2505) 或 ┉ (U+2509)
+  //
+  //  双线：═ (U+2550)，竖线双：║ (U+2551)
   // 实现虚线
   Future<void> _printDottedLine() async {
     // final count =16;
@@ -222,7 +222,7 @@ class IMinPrinterV1 implements RSPrinterInterface {
     // for (int i = 0; i < count; i++) {
     //   buffer.write('┄');
     // }
-    final count =  16;
+    final count = 16;
     final line = ''.padRight(count, '┄'); // 可改成'━'等字符
     await _iminPrinter.printText(
       line,
@@ -235,7 +235,6 @@ class IMinPrinterV1 implements RSPrinterInterface {
       ),
     );
   }
-
 
   @override
   Future<bool> printLine(LineStyle style) async {
@@ -305,40 +304,5 @@ class IMinPrinterV1 implements RSPrinterInterface {
   // 辅助方法：走纸
   Future<void> _printAndFeedPaper(int distance) async {
     await _iminPrinter.printAndFeedPaper(distance);
-  }
-
-
-  // 转换对齐方式（自定义Align -> IminPrintAlign）
-  IminPrintAlign _convertAlignment(Alignment alignment) {
-    switch (alignment) {
-      case Alignment.center:
-        return IminPrintAlign.center;
-      case Alignment.right:
-        return IminPrintAlign.right;
-      default:
-        return IminPrintAlign.left;
-    }
-  }
-
-
-  // 设置文字字体
-  _convertTypeface(PrintStyle style) {
-    IminTypeface typeface = IminTypeface.typefaceDefaultBold;
-    return typeface;
-  }
-
-  // 设置文字样式
-  _convertFontStyle(PrintStyle style) {
-    IminFontStyle fontStyle = IminFontStyle.normal;
-    if (style.isItalic && style.isBold) {
-      fontStyle = IminFontStyle.boldItalic;
-    } else if (style.isItalic) {
-      fontStyle = IminFontStyle.italic;
-    } else if (style.isBold) {
-      fontStyle = IminFontStyle.bold;
-    } else {
-      fontStyle = IminFontStyle.normal;
-    }
-    return fontStyle;
   }
 }

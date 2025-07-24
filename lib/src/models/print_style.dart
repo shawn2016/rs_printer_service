@@ -1,9 +1,13 @@
+// 字体大小
 enum FontSize { small, normal, large, xxxxxlarge,xxxxlarge,xxxlarge,xxlarge,xlarge }
 
+// 对齐方式
 enum Alignment { left, center, right }
 
+// 线条样式
 enum LineStyle { boldSolid, dotted, solid }
 
+// 打印样式
 class PrintStyle {
   final FontSize fontSize;
   final Alignment alignment;
